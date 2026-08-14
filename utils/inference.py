@@ -1,6 +1,58 @@
 import torch
 
-from preprocessing import detokenize
+from pathlib import Path
+
+from models.seq2seq import Seq2Seq
+from utils.helpers import load_json, resolve_device
+from utils.preprocessing import detokenize, spacy_tokenizer
+
+
+# AI Amended: Load a complete trained run from results so the CLI needs only config.yaml.
+def translate_from_results(config, results_dir):
+    translation_config = config["translation"]
+    model_name = translation_config["model_name"]
+
+    if not isinstance(model_name, str) or model_name != Path(model_name).name:
+        raise ValueError("translation.model_name must be a directory name, not a path.")
+
+    training_dir = results_dir / model_name
+    saved_config = load_json(training_dir / "configs.json")
+    src_vocab = load_json(training_dir / "src_token_to_id.json")
+    tgt_vocab = load_json(training_dir / "tgt_token_to_id.json")
+    tgt_id_to_token = load_json(training_dir / "tgt_id_to_token.json")
+    model_config = saved_config["model"]
+    device = resolve_device(config.get("device", "auto"))
+
+    model = Seq2Seq(
+        input_dim=len(src_vocab),
+        output_dim=len(tgt_vocab),
+        embedding_dim=model_config["embedding_dim"],
+        hidden_dim=model_config["hidden_dim"],
+        src_pad_idx=src_vocab["<pad>"],
+        tgt_pad_idx=tgt_vocab["<pad>"],
+        bidirectional=model_config["bidirectional"],
+        peeky=model_config["peeky"],
+        dropout=model_config["dropout"],
+    ).to(device)
+    model.load_state_dict(
+        torch.load(
+            training_dir / "best_model.pt",
+            map_location=device,
+            weights_only=True,
+        )
+    )
+
+    return translate_sentence(
+        model=model,
+        sentence=translation_config["text"],
+        tokenizer=spacy_tokenizer,
+        src_vocab=src_vocab,
+        tgt_vocab=tgt_vocab,
+        tgt_id_to_token=tgt_id_to_token,
+        device=device,
+        lowercase=translation_config.get("lowercase", True),
+        max_length=translation_config.get("max_length", 100),
+    )
 
 
 @torch.inference_mode()

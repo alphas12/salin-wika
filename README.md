@@ -1,30 +1,37 @@
-# **Eh Salin natin!**
-
+# Eh Salin natin!
 ---
 
-## **Overview:**
+<!-- AI Amended: Document the shortest local and Docker path to the connected two-command application. -->
 
-This repository contains Encoder-Decoder models for language translations. The goal of this project is to perform translations for various languages in the Philippines. Contributions to this project are more than welcome!.
+This project trains and runs a Cebuano-to-Tagalog LSTM encoder-decoder without attention. Configuration lives only in `config.yaml`, and generated artifacts always live in `results/`.
 
-## **Features:**
+## Local setup
 
-- Translation between two languages.
-- Currently Supported Translations:
-    - Cebuano -> Tagalog
-- Train your own model with your own corpus.
+Use Python 3.12, then run `python -m pip install -r requirements.txt`. The PyTorch dependency prefers the CUDA 12.8 wheel on supported Linux/Windows computers, uses the native macOS wheel on Mac, and automatically falls back to CPU at runtime. Set `device` in `config.yaml` to `auto`, `cuda`, `mps`, or `cpu`.
 
-## **Training and Evaluation**
+The CLI has exactly two commands:
 
-**Training**
+- `python main.py training`
+- `python main.py translation`
 
-> **<font color='red' >NOTE: BEFORE DOING ANY TRAINING, CLEAN YOUR CORPUS FIRST!</font>**
+Before either command, edit `config.yaml`. Translation reads `translation.text` and loads `results/<translation.model_name>/best_model.pt` plus that run's saved configuration and vocabularies.
 
-**Evaluation Metrics**
-- Loss
-- Perplexity
-- BLEU (Bilingual Evaluation Understudy)
+## Docker (Recommended setup)
 
-## **Setup Guide**
+Build with `docker build -t encoder-decoder .`.
 
+Docker builds use CPU PyTorch on ARM64 hosts such as Apple Silicon and the CUDA 12.8 wheel on AMD64 NVIDIA training computers. The Linux container cannot use Apple MPS.
 
-## **Languages and Libraries**
+Train on CPU with `docker run --rm -v "$PWD/results:/app/results" encoder-decoder training`.
+
+Train on an NVIDIA GPU by adding `--gpus all`: `docker run --rm --gpus all -v "$PWD/results:/app/results" encoder-decoder training`.
+
+Translate with `docker run --rm -v "$PWD/config.yaml:/app/config.yaml:ro" -v "$PWD/results:/app/results" encoder-decoder translation`.
+
+The Docker host must have Docker's NVIDIA GPU support configured for `--gpus all`. Apple MPS remains available for local Python runs.
+
+## Outputs
+
+Each training run writes checkpoints, the best model, vocabularies, the effective configuration, loss/perplexity history, and BLEU results below `results/<training.name>/`.
+
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) and [CODE_GUIDE.md](docs/CODE_GUIDE.md) for the full project map.

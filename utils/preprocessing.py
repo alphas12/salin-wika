@@ -5,7 +5,9 @@ import random
 
 from collections import Counter
 from torch.utils.data import Dataset, Sampler
+from torch.nn.utils.rnn import pad_sequence
 
+# AI Amended: Keep the existing spaCy tokenizer while making batching and Polars-backed datasets executable.
 nlp = spacy.blank("xx")
 
 
@@ -60,17 +62,15 @@ class TranslationDataset(Dataset):
         lowercase=True,
         max_length=None,
     ):
-        self.df = df.copy().reset_index(drop=True)
-
         self.tokenizer = tokenizer
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
         self.lowercase = lowercase
         self.max_length = max_length
-        self.tgt_texts = self.df[tgt_col].astype(str).tolist()
+        self.tgt_texts = [str(text) for text in df[tgt_col].to_list()]
 
-        self.src = self.df[src_col].apply(self._encode_src).tolist()
-        self.tgt = self.df[tgt_col].apply(self._encode_tgt).tolist()
+        self.src = [self._encode_src(text) for text in df[src_col].to_list()]
+        self.tgt = [self._encode_tgt(text) for text in df[tgt_col].to_list()]
 
     def __len__(self):
         return len(self.src)
@@ -113,8 +113,8 @@ def collate_fn(batch, src_pad_idx, tgt_pad_idx):
     src_batch, tgt_batch = zip(*batch)
 
     src_lengths = torch.tensor([len(src) for src in src_batch], dtype=torch.long)
-    src_batch = pad_sequence(src_batch, batch_first=True, padding_value=src_pad_idx)  # type: ignore
-    tgt_batch = pad_sequence(tgt_batch, batch_first=True, padding_value=tgt_pad_idx)  # type: ignore
+    src_batch = pad_sequence(src_batch, batch_first=True, padding_value=src_pad_idx)
+    tgt_batch = pad_sequence(tgt_batch, batch_first=True, padding_value=tgt_pad_idx)
 
     return src_batch, src_lengths, tgt_batch
 

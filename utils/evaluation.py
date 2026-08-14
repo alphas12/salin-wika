@@ -1,11 +1,12 @@
 import torch
-import numpy as np
+import math
 import sacrebleu
 
-from inference import translate_batch
-from preprocessing import detokenize
+from utils.inference import translate_batch
+from utils.preprocessing import detokenize
 
 
+# AI Amended: Use package imports and standard-library metric math so evaluation runs from the root CLI.
 @torch.inference_mode()
 def evaluate_loss(model, loader, criterion, tgt_pad_idx, device):
     model.eval()
@@ -21,14 +22,14 @@ def evaluate_loss(model, loader, criterion, tgt_pad_idx, device):
         decoder_target = tgt[:, 1:]
 
         logits = model(
-            src=src, 
-            src_lengths=src_lengths, 
-            decoder_input=decoder_input
+            src=src,
+            src_lengths=src_lengths,
+            decoder_input=decoder_input,
         )
 
         loss_sum = criterion(
-            input=logits.reshape(-1, logits.size(-1)), 
-            target=decoder_target.reshape(-1)
+            input=logits.reshape(-1, logits.size(-1)),
+            target=decoder_target.reshape(-1),
         )
 
         # DO NOT COUNT PADDINGS AS TOKENS
@@ -38,7 +39,7 @@ def evaluate_loss(model, loader, criterion, tgt_pad_idx, device):
         total_tokens += target_token_count.item()
 
     average_loss = total_loss / total_tokens
-    perplexity = float(np.exp(average_loss))
+    perplexity = math.exp(average_loss)
 
     return average_loss, perplexity
 

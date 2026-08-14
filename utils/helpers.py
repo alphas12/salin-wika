@@ -1,5 +1,33 @@
 import json
-import numpy as np
+
+import torch
+
+
+# AI Amended: Centralize JSON loading and validated automatic device selection for training and inference.
+def load_json(path):
+    with open(path, encoding="utf-8") as file:
+        return json.load(file)
+
+
+def resolve_device(requested_device="auto"):
+    requested_device = requested_device.lower()
+
+    if requested_device == "auto":
+        if torch.cuda.is_available():
+            requested_device = "cuda"
+        elif torch.backends.mps.is_available():
+            requested_device = "mps"
+        else:
+            requested_device = "cpu"
+
+    if requested_device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was requested in config.yaml but is unavailable.")
+    if requested_device == "mps" and not torch.backends.mps.is_available():
+        raise RuntimeError("MPS was requested in config.yaml but is unavailable.")
+    if requested_device not in {"cpu", "cuda", "mps"}:
+        raise ValueError("device must be one of: auto, cpu, cuda, mps.")
+
+    return torch.device(requested_device)
 
 
 def save_vocabs(
@@ -33,22 +61,13 @@ def save_results(
     test_results,
     config,
 ):
-    def to_builtin(value): # helper function for the serialization of numpy values
-        if isinstance(value, dict):
-            return {key: to_builtin(item) for key, item in value.items()}
-        if isinstance(value, list):
-            return [to_builtin(item) for item in value]
-        if isinstance(value, np.generic):
-            return value.item()
-        return value
-
     with open(training_dir / "training_data.json", "w") as file:
-        json.dump(to_builtin(training_data), file, indent=4)
+        json.dump(training_data, file, indent=4)
 
     with open(training_dir / "test_results.json", "w") as file:
-        json.dump(to_builtin(test_results), file, indent=4)
+        json.dump(test_results, file, indent=4)
 
     with open(training_dir / "configs.json", "w") as file:
-        json.dump(to_builtin(config), file, indent=4)
+        json.dump(config, file, indent=4)
 
     print(f"Saved results for: {training_dir.name}")

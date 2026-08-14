@@ -1,7 +1,9 @@
-import numpy as np
+import math
+
 from torch.nn.utils import clip_grad_norm_
 
 
+# AI Amended: Call Seq2Seq with its real parameter names and keep token-normalized training metrics.
 def train_one_epoch(
     model,
     loader,
@@ -26,14 +28,14 @@ def train_one_epoch(
         optimizer.zero_grad()
 
         logits = model(
-            x=src, 
-            src_lenghts=src_lengths, 
-            decoder_input=decoder_input
+            src=src,
+            src_lengths=src_lengths,
+            decoder_input=decoder_input,
         )
 
         loss_sum = criterion(
-            input=logits.reshape(-1, logits.size(-1)), 
-            target=decoder_target.reshape(-1)
+            input=logits.reshape(-1, logits.size(-1)),
+            target=decoder_target.reshape(-1),
         )
 
         target_token_count = (decoder_target != tgt_pad_idx).sum()
@@ -42,16 +44,13 @@ def train_one_epoch(
 
         loss.backward()
 
-        clip_grad_norm_(
-            parameters=model.parameters(), 
-            max_norm=max_grad_norm
-        )
+        clip_grad_norm_(parameters=model.parameters(), max_norm=max_grad_norm)
         optimizer.step()
 
         total_loss += loss_sum.item()
         total_tokens += target_token_count.item()
 
     average_loss = total_loss / total_tokens
-    perplexity = float(np.exp(average_loss))
+    perplexity = math.exp(average_loss)
 
     return average_loss, perplexity

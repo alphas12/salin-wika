@@ -1,0 +1,38 @@
+# AI Amended: Provide the single configuration surface for training and translation.
+device: auto
+
+data:
+  corpus_path: corpus/cebtag_105k.csv
+  src_col: cebuano
+  tgt_col: tagalog
+  train_size: 0.8
+  valid_size: 0.1
+  test_size: 0.1
+  min_freq: 2
+  max_length: 100
+  lowercase: true
+
+model:
+  embedding_dim: 256
+  hidden_dim: 512
+  bidirectional: false
+  peeky: false
+  dropout: 0.3
+
+training:
+  name: seq2seq
+  batch_size: 64
+  num_workers: 0
+  pin_memory: true
+  epochs: 20
+  optimizer: adamw
+  lr: 0.001
+  patience: 5
+  max_grad_norm: 1.0
+  seed: 42
+
+translation:
+  model_name: seq2seq
+  text: Maayong buntag.
+  lowercase: true
+  max_length: 100

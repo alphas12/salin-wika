@@ -6,8 +6,7 @@ import polars as pl
 from pathlib import Path
 from torch.utils.data import DataLoader
 from functools import partial
-from sklearn.model_selection import train_test_split
-from preprocessing import (
+from utils.preprocessing import (
     build_vocab,
     spacy_tokenizer,
     TranslationDataset,
@@ -15,23 +14,23 @@ from preprocessing import (
     collate_fn,
 )
 from models.seq2seq import Seq2Seq
-from training import train_one_epoch
-from evaluation import evaluate_bleu, evaluate_loss
-from helpers import save_results, save_vocabs
+from utils.training import train_one_epoch
+from utils.evaluation import evaluate_bleu, evaluate_loss
+from utils.helpers import resolve_device, save_results, save_vocabs
 
 
+# AI Amended: Make the existing pipeline consume the shared config and connect every training stage end to end.
 class TrainingPipeline:
-    def __init__(
-        self,
-        df_path: Path | str,
-        src_col: str,
-        tgt_col: str,
-        config: dict,
-    ):
-        self.df = pl.read_csv(df_path)
-        self.src_col = src_col
-        self.tgt_col = tgt_col
+    def __init__(self, config: dict):
+        data_config = config["data"]
+
+        self.df = pl.read_csv(data_config["corpus_path"])
+        self.src_col = data_config["src_col"]
+        self.tgt_col = data_config["tgt_col"]
         self.config = config
+        self.data_config = data_config
+        self.model_config = config["model"]
+        self.training_config = config["training"]
 
         # Pre-processing Pipeline
         # ---------------------------------
@@ -41,10 +40,14 @@ class TrainingPipeline:
 
         # Step 2: Vocabulary creation and token mapping
         self.src_vocab, self.src_id_to_token = build_vocab(
-            self.train_df[src_col], spacy_tokenizer, min_freq=config["min_freq"]
+            self.train_df[self.src_col],
+            spacy_tokenizer,
+            min_freq=data_config["min_freq"],
         )
         self.tgt_vocab, self.tgt_id_to_token = build_vocab(
-            self.train_df[tgt_col], spacy_tokenizer, min_freq=config["min_freq"]
+            self.train_df[self.tgt_col],
+            spacy_tokenizer,
+            min_freq=data_config["min_freq"],
         )
 
         # Step 3: Initialize the datasets
@@ -55,34 +58,28 @@ class TrainingPipeline:
 
     def _create_splits_(self):
 
-        df = self.df
-        train_size = self.config["train_size"]
-        valid_size = self.config["valid_size"]
-        test_size = self.config["test_size"]
-        seed = self.config["seed"]
+        train_size = self.data_config["train_size"]
+        valid_size = self.data_config["valid_size"]
+        test_size = self.data_config["test_size"]
+        seed = self.training_config["seed"]
 
         # Ensure sizes sums up to 1.0
-        assert (
-            train_size + valid_size + test_size
-        ) == 1.0, "Split sizes must sum up to 1.0!"
+        if abs(train_size + valid_size + test_size - 1.0) > 1e-9:
+            raise ValueError("Data split sizes must sum to 1.0.")
+        if min(train_size, valid_size, test_size) <= 0:
+            raise ValueError("Data split sizes must all be greater than zero.")
 
-        train_df, temp_df = train_test_split(
-            df,
-            train_size=train_size,
-            random_state=seed,
-        )
+        shuffled_df = self.df.sample(fraction=1.0, shuffle=True, seed=seed)
+        train_count = int(len(shuffled_df) * train_size)
+        valid_count = int(len(shuffled_df) * valid_size)
+        test_count = len(shuffled_df) - train_count - valid_count
 
-        # Computing the relative sizes for exact threeway split
-        remaining_size = valid_size + test_size
-        valid_relative_size = valid_size / remaining_size
-        test_relative_size = test_size / remaining_size
+        if min(train_count, valid_count, test_count) == 0:
+            raise ValueError("The configured data splits must each contain at least one row.")
 
-        valid_df, test_df = train_test_split(
-            temp_df,
-            train_size=valid_relative_size,
-            test_size=test_relative_size,
-            random_state=seed,
-        )
+        train_df = shuffled_df.slice(0, train_count)
+        valid_df = shuffled_df.slice(train_count, valid_count)
+        test_df = shuffled_df.slice(train_count + valid_count)
 
         return train_df, valid_df, test_df
 
@@ -96,7 +93,8 @@ class TrainingPipeline:
         tokenizer = spacy_tokenizer
         src_vocab = self.src_vocab
         tgt_vocab = self.tgt_vocab
-        max_length = self.config["max_length"]
+        max_length = self.data_config["max_length"]
+        lowercase = self.data_config.get("lowercase", True)
 
         train_set = TranslationDataset(
             df=train_df,
@@ -105,6 +103,7 @@ class TrainingPipeline:
             src_vocab=src_vocab,
             tgt_vocab=tgt_vocab,
             tokenizer=tokenizer,
+            lowercase=lowercase,
             max_length=max_length,
         )
 
@@ -115,6 +114,7 @@ class TrainingPipeline:
             src_vocab=src_vocab,
             tgt_vocab=tgt_vocab,
             tokenizer=tokenizer,
+            lowercase=lowercase,
             max_length=max_length,
         )
 
@@ -125,6 +125,7 @@ class TrainingPipeline:
             src_vocab=src_vocab,
             tgt_vocab=tgt_vocab,
             tokenizer=tokenizer,
+            lowercase=lowercase,
             max_length=max_length,
         )
 
@@ -139,11 +140,11 @@ class TrainingPipeline:
         valid_set = self.valid_set
         test_set = self.test_set
 
-        batch_size = self.config["batch_size"]
-        num_workers = self.config["num_workers"]
-        pin_memory = self.config["pin_memory"]
+        batch_size = self.training_config["batch_size"]
+        num_workers = self.training_config["num_workers"]
+        pin_memory = self.training_config["pin_memory"] and torch.cuda.is_available()
 
-        seed = self.config["seed"]
+        seed = self.training_config["seed"]
 
         collate = partial(
             collate_fn,
@@ -188,20 +189,30 @@ class TrainingPipeline:
 
     def train(self, results_dir: Path):
 
-        model_name = self.config["name"]
+        model_name = self.training_config["name"]
+        if not isinstance(model_name, str) or model_name != Path(model_name).name:
+            raise ValueError("training.name must be a directory name, not a path.")
+
+        training_dir = results_dir / model_name
+        training_dir.mkdir(parents=True, exist_ok=True)
+
         src_dim = len(self.src_vocab)
         tgt_dim = len(self.tgt_vocab)
         src_pad_idx = self.src_vocab["<pad>"]
         tgt_pad_idx = self.tgt_vocab["<pad>"]
-        embedding_dim = self.config["embedding_dim"]
-        hidden_dim = self.config["hidden_dim"]
-        is_bidirectional = self.config["bidirectional"]
-        is_peeky = self.config["peeky"]
-        dropout = self.config["dropout"]
-        epochs = self.config["epochs"]
-        chosen_optimizer = self.config["optimizer"].lower()
-        learning_rate = self.config["lr"]
-        patience = self.config["patience"]
+
+        embedding_dim = self.model_config["embedding_dim"]
+        hidden_dim = self.model_config["hidden_dim"]
+        is_bidirectional = self.model_config["bidirectional"]
+        is_peeky = self.model_config["peeky"]
+        dropout = self.model_config["dropout"]
+
+        epochs = self.training_config["epochs"]
+        chosen_optimizer = self.training_config["optimizer"].lower()
+        learning_rate = self.training_config["lr"]
+        patience = self.training_config["patience"]
+        max_grad_norm = self.training_config.get("max_grad_norm", 1.0)
+        
         train_loader = self.train_loader
         valid_loader = self.valid_loader
         test_loader = self.test_loader
@@ -210,24 +221,21 @@ class TrainingPipeline:
         tgt_vocab = self.tgt_vocab
         src_id_to_token = self.src_id_to_token
         tgt_id_to_token = self.tgt_id_to_token
-        max_length = self.config["max_length"]
+        max_length = self.data_config["max_length"]
 
         # Training Initialization
         # ---------------------------------
         save_vocabs(
-            results_dir=results_dir, 
-            src_vocab=src_vocab, 
+            results_dir=training_dir,
+            src_vocab=src_vocab,
             tgt_vocab=tgt_vocab,
             src_id_to_token=src_id_to_token,
             tgt_id_to_token=tgt_id_to_token,
         )
 
-        req_device = "cpu"
-        if torch.cuda.is_available():
-            req_device = "cuda"
-        elif torch.backends.mps.is_available():
-            req_device = "mps"
-        device = torch.device(req_device)
+        device = resolve_device(self.config.get("device", "auto"))
+        torch.manual_seed(self.training_config["seed"])
+        print(f"Training '{model_name}' on {device}...")
 
         model = Seq2Seq(
             input_dim=src_dim,
@@ -246,6 +254,10 @@ class TrainingPipeline:
             "adam": optim.Adam,
             "sgd": optim.SGD,
         }
+        if chosen_optimizer not in optimizer_classes:
+            choices = ", ".join(optimizer_classes)
+            raise ValueError(f"optimizer must be one of: {choices}.")
+
         optimizer = optimizer_classes[chosen_optimizer](
             params=model.parameters(), lr=learning_rate
         )
@@ -253,9 +265,6 @@ class TrainingPipeline:
 
         # Training Loop
         # ---------------------------------
-        training_dir = results_dir / model_name
-        training_dir.mkdir(exist_ok=True)
-
         training_data = {
             "model_name": model_name,
             "train_loss": [],
@@ -275,6 +284,7 @@ class TrainingPipeline:
                 criterion=criterion,
                 tgt_pad_idx=tgt_pad_idx,
                 device=device,
+                max_grad_norm=max_grad_norm,
             )
 
             valid_loss, valid_perplexity = evaluate_loss(
@@ -289,6 +299,11 @@ class TrainingPipeline:
             training_data["valid_loss"].append(valid_loss)
             training_data["train_perplexity"].append(train_perplexity)
             training_data["valid_perplexity"].append(valid_perplexity)
+
+            print(
+                f"Epoch {epoch + 1}/{epochs} | "
+                f"train loss: {train_loss:.4f} | valid loss: {valid_loss:.4f}"
+            )
 
             # Checkpoint
             torch.save(
@@ -311,7 +326,9 @@ class TrainingPipeline:
         # ---------------------------------
         model.load_state_dict(
             state_dict=torch.load(
-                f=(training_dir / "best_model.pt"), map_location=device
+                f=(training_dir / "best_model.pt"),
+                map_location=device,
+                weights_only=True,
             )
         )
 
