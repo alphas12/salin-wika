@@ -2,6 +2,7 @@ import torch
 import math
 import sacrebleu
 
+from tqdm import tqdm
 from utils.inference import translate_batch
 from utils.preprocessing import detokenize
 
@@ -14,7 +15,8 @@ def evaluate_loss(model, loader, criterion, tgt_pad_idx, device):
     total_loss = 0.0
     total_tokens = 0
 
-    for src, src_lengths, tgt in loader:
+    tqdm_loader = tqdm(loader, desc="Evaluating Loss..", leave=True)
+    for src, src_lengths, tgt in tqdm_loader:
         src = src.to(device)
         tgt = tgt.to(device)
 
@@ -58,7 +60,8 @@ def evaluate_bleu(
     hypotheses = []
     references = []
 
-    for src, src_lengths, tgt in loader:
+    tqdm_loader = tqdm(loader, desc="Evaluating BLEU..", leave=True)
+    for src, src_lengths, tgt in tqdm_loader:
 
         translations = translate_batch(
             model=model,
@@ -85,9 +88,7 @@ def evaluate_bleu(
                     tgt_vocab["<pad>"],
                     tgt_vocab["<bos>"],
                 }:
-                    tokens.append(
-                        tgt_id_to_token[token_id]
-                    )
+                    tokens.append(tgt_id_to_token[token_id])
 
             references.append(detokenize(tokens))
 

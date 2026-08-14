@@ -1,5 +1,6 @@
 import math
 
+from tqdm import tqdm
 from torch.nn.utils import clip_grad_norm_
 
 
@@ -18,7 +19,8 @@ def train_one_epoch(
     total_loss = 0.0
     total_tokens = 0
 
-    for src, src_lengths, tgt in loader:
+    tqdm_loader = tqdm(loader, desc="Training...", leave=True)
+    for src, src_lengths, tgt in tqdm_loader:
         src = src.to(device)
         tgt = tgt.to(device)
 
