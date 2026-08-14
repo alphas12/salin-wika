@@ -1,12 +1,11 @@
 # SalinWika!
----
 
-> __<font color='red'> NOTE: PLEASE CLEAN THE CORPUS BEFORE TRAINING, AND IT MUST BE IN .CSV FORMAT WITH TWO (2) COLUMNS (FOR THE TWO LANGUAGES)</font>__
+> **NOTE: PLEASE CLEAN THE CORPUS BEFORE TRAINING, AND IT MUST BE IN .CSV FORMAT WITH TWO (2) COLUMNS (FOR THE TWO LANGUAGES)**
 
 This project trains and runs a Cebuano-to-Tagalog LSTM encoder-decoder without attention. Configuration lives only in `config.yaml`, and generated artifacts always live in `results/`. More language support will be provided soon (I'm still testing with the models themselves). Contributions for this project are more than welcome!.
 
-### **<font color='#F59E0B'>PROJECT GOAL: Support for various Filipino languages</font>**
-**<font color='green'>Current Goal: Train on Eng-Fil to find the best translation model</font>**
+### **PROJECT GOAL: Support for various Filipino languages**
+**Current Goal: Train on Eng-Fil to find the best translation model**
 
 
 ## Local setup

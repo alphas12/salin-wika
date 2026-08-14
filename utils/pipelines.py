@@ -81,6 +81,8 @@ class TrainingPipeline:
         valid_df = shuffled_df.slice(train_count, valid_count)
         test_df = shuffled_df.slice(train_count + valid_count)
 
+        print("Created dataset splits...")
+
         return train_df, valid_df, test_df
 
     def _create_dataset_(self):
@@ -128,6 +130,8 @@ class TrainingPipeline:
             lowercase=lowercase,
             max_length=max_length,
         )
+
+        print("Created datasets...")
 
         return train_set, valid_set, test_set
 
@@ -184,6 +188,8 @@ class TrainingPipeline:
             pin_memory=pin_memory,
             collate_fn=collate,
         )
+
+        print("Created data loaders...")
 
         return train_loader, valid_loader, test_loader
 
