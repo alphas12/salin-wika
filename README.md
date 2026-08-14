@@ -1,9 +1,13 @@
-# Eh Salin natin!
+# SalinWika!
 ---
 
-<!-- AI Amended: Document the shortest local and Docker path to the connected two-command application. -->
+> __<font color='red'> NOTE: PLEASE CLEAN THE CORPUS BEFORE TRAINING, AND IT MUST BE IN .CSV FORMAT WITH TWO (2) COLUMNS (FOR THE TWO LANGUAGES)</font>__
 
-This project trains and runs a Cebuano-to-Tagalog LSTM encoder-decoder without attention. Configuration lives only in `config.yaml`, and generated artifacts always live in `results/`.
+This project trains and runs a Cebuano-to-Tagalog LSTM encoder-decoder without attention. Configuration lives only in `config.yaml`, and generated artifacts always live in `results/`. More language support will be provided soon (I'm still testing with the models themselves). Contributions for this project are more than welcome!.
+
+### **<font color='#F59E0B'>PROJECT GOAL: Support for various Filipino languages</font>**
+**<font color='green'>Current Goal: Train on Eng-Fil to find the best translation model</font>**
+
 
 ## Local setup
 
