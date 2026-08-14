@@ -48,8 +48,9 @@ def save_vocabs(
         ],
     }
 
+    # AI Amended: Write vocabulary text as UTF-8 on every operating system.
     for filename, vocabulary in vocabularies.items():
-        with open(results_dir / filename, "w") as file:
+        with open(results_dir / filename, "w", encoding="utf-8") as file:
             json.dump(vocabulary, file, ensure_ascii=False)
 
     print(f"Saved Vocabulary at '{results_dir}'...")
@@ -61,13 +62,14 @@ def save_results(
     test_results,
     config,
 ):
-    with open(training_dir / "training_data.json", "w") as file:
+    # AI Amended: Keep all saved run metadata portable when it contains Unicode text.
+    with open(training_dir / "training_data.json", "w", encoding="utf-8") as file:
         json.dump(training_data, file, indent=4)
 
-    with open(training_dir / "test_results.json", "w") as file:
+    with open(training_dir / "test_results.json", "w", encoding="utf-8") as file:
         json.dump(test_results, file, indent=4)
 
-    with open(training_dir / "configs.json", "w") as file:
+    with open(training_dir / "configs.json", "w", encoding="utf-8") as file:
         json.dump(config, file, indent=4)
 
     print(f"Saved results for: {training_dir.name}")
