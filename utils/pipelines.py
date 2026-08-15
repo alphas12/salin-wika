@@ -214,6 +214,7 @@ class TrainingPipeline:
         is_bidirectional = self.model_config["bidirectional"]
         is_peeky = self.model_config["peeky"]
         dropout = self.model_config["dropout"]
+        num_layers = self.model_config["num_layers"]
 
         epochs = self.training_config["epochs"]
         chosen_optimizer = self.training_config["optimizer"].lower()
@@ -255,6 +256,7 @@ class TrainingPipeline:
             bidirectional=is_bidirectional,
             peeky=is_peeky,
             dropout=dropout,
+            num_layers=num_layers,
         ).to(device)
 
         optimizer_classes = {
