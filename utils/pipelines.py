@@ -75,7 +75,9 @@ class TrainingPipeline:
         test_count = len(shuffled_df) - train_count - valid_count
 
         if min(train_count, valid_count, test_count) == 0:
-            raise ValueError("The configured data splits must each contain at least one row.")
+            raise ValueError(
+                "The configured data splits must each contain at least one row."
+            )
 
         train_df = shuffled_df.slice(0, train_count)
         valid_df = shuffled_df.slice(train_count, valid_count)
@@ -218,7 +220,7 @@ class TrainingPipeline:
         learning_rate = self.training_config["lr"]
         patience = self.training_config["patience"]
         max_grad_norm = self.training_config.get("max_grad_norm", 1.0)
-        
+
         train_loader = self.train_loader
         valid_loader = self.valid_loader
         test_loader = self.test_loader
@@ -311,10 +313,14 @@ class TrainingPipeline:
                 f"train loss: {train_loss:.4f} | valid loss: {valid_loss:.4f}"
             )
 
+            checkpoint = {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+            }
+
             # Checkpoint
-            torch.save(
-                obj=model.state_dict(), f=(training_dir / f"checkpoint_{epoch+1}.pt")
-            )
+            torch.save(obj=checkpoint, f=(training_dir / f"checkpoint.pt"))
 
             # Save best model and early stopping check
             if valid_loss < best_loss:
