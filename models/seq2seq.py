@@ -1,3 +1,7 @@
+
+# Peeky Decoder, comes from: Cho et al. (2014)
+# Link: https://arxiv.org/abs/1406.1078
+
 import torch
 import torch.nn as nn
 

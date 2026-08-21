@@ -14,6 +14,7 @@ from utils.preprocessing import (
     collate_fn,
 )
 from models.seq2seq import Seq2Seq
+from models.bahdanau import BahdanauSeq2Seq
 from utils.training import train_one_epoch
 from utils.evaluation import evaluate_bleu, evaluate_loss
 from utils.helpers import resolve_device, save_results, save_vocabs
@@ -29,7 +30,10 @@ class TrainingPipeline:
         self.tgt_col = data_config["tgt_col"]
         self.config = config
         self.data_config = data_config
-        self.model_config = config["model"]
+        self.model_choice = config["model"]
+        if type(self.model_choice) is not int or self.model_choice not in {1, 2}:
+            raise ValueError("model must be 1 (Seq2Seq) or 2 (Bahdanau).")
+        self.model_config = config[f"model_{self.model_choice}"]
         self.training_config = config["training"]
 
         # Pre-processing Pipeline
@@ -209,13 +213,6 @@ class TrainingPipeline:
         src_pad_idx = self.src_vocab["<pad>"]
         tgt_pad_idx = self.tgt_vocab["<pad>"]
 
-        embedding_dim = self.model_config["embedding_dim"]
-        hidden_dim = self.model_config["hidden_dim"]
-        is_bidirectional = self.model_config["bidirectional"]
-        is_peeky = self.model_config["peeky"]
-        dropout = self.model_config["dropout"]
-        num_layers = self.model_config["num_layers"]
-
         epochs = self.training_config["epochs"]
         chosen_optimizer = self.training_config["optimizer"].lower()
         learning_rate = self.training_config["lr"]
@@ -246,18 +243,29 @@ class TrainingPipeline:
         torch.manual_seed(self.training_config["seed"])
         print(f"Training '{model_name}' on {device}...")
 
-        model = Seq2Seq(
-            input_dim=src_dim,
-            output_dim=tgt_dim,
-            embedding_dim=embedding_dim,
-            hidden_dim=hidden_dim,
-            src_pad_idx=src_pad_idx,
-            tgt_pad_idx=tgt_pad_idx,
-            bidirectional=is_bidirectional,
-            peeky=is_peeky,
-            dropout=dropout,
-            num_layers=num_layers,
-        ).to(device)
+        if self.model_choice == 1:
+            model = Seq2Seq(
+                input_dim=src_dim,
+                output_dim=tgt_dim,
+                embedding_dim=self.model_config["embedding_dim"],
+                hidden_dim=self.model_config["hidden_dim"],
+                src_pad_idx=src_pad_idx,
+                tgt_pad_idx=tgt_pad_idx,
+                bidirectional=self.model_config["bidirectional"],
+                peeky=self.model_config["peeky"],
+                dropout=self.model_config["dropout"],
+                num_layers=self.model_config["num_layers"],
+            ).to(device)
+        else:
+            model = BahdanauSeq2Seq(
+                input_dim=src_dim,
+                output_dim=tgt_dim,
+                embedding_dim=self.model_config["embedding_dim"],
+                encoder_dim=self.model_config["encoder_dim"],
+                decoder_dim=self.model_config["decoder_dim"],
+                attention_dim=self.model_config["attention_dim"],
+                dropout=self.model_config["dropout"],
+            ).to(device)
 
         optimizer_classes = {
             "adamw": optim.AdamW,
