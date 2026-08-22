@@ -74,17 +74,23 @@ def translate_from_results(config, results_dir):
 def _encode(model, src, src_lengths):
     if isinstance(model, BahdanauSeq2Seq):
         encoder_outputs, states = model.encoder(src, src_lengths)
+        projected_keys = model.attention.key_layer(encoder_outputs)
         positions = torch.arange(src.size(1), device=src.device).unsqueeze(0)
         src_mask = positions < src_lengths.to(src.device).unsqueeze(1)
-        return states, (encoder_outputs, src_mask)
+        return states, (encoder_outputs, projected_keys, src_mask)
 
     return model.encode(src, src_lengths)
 
 
 def _decode_step(model, current_token, states, context):
     if isinstance(model, BahdanauSeq2Seq):
-        encoder_outputs, src_mask = context
-        attention = model.attention(encoder_outputs, states, src_mask)
+        encoder_outputs, projected_keys, src_mask = context
+        attention = model.attention(
+            encoder_outputs=encoder_outputs,
+            projected_keys=projected_keys,
+            prev_hidden_decoder=states,
+            src_mask=src_mask,
+        )
         return model.decoder(current_token.squeeze(1), states, attention)
 
     logits, states = model.decoder(

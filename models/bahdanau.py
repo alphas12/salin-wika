@@ -82,7 +82,7 @@ class BahdanauAttention(nn.Module):
         self.key_layer = nn.Linear(key_size, hidden_size)
         self.energy_layer = nn.Linear(hidden_size, 1)
 
-    def forward(self, encoder_outputs, prev_hidden_decoder, src_mask):
+    def forward(self, encoder_outputs, projected_keys, prev_hidden_decoder, src_mask):
 
         # Prev Hidden Decoder: [B, Dec]
         # Encoder Dims: [B, T, 2 * Enc]
@@ -94,13 +94,9 @@ class BahdanauAttention(nn.Module):
         # [B, 1, A]
         query_out = query_out.unsqueeze(1)
 
-        # k_j = U_a h_j
-        # [B, T, A]
-        key_out = self.key_layer(encoder_outputs)
-
         # tanh(q_i + k_j)
         # [B, T, A]
-        energy_input = torch.tanh(query_out + key_out)
+        energy_input = torch.tanh(query_out + projected_keys)
 
         # e_ij = v_a^T tanh(q_i + k_j)
         # [B, T, 1]
@@ -238,6 +234,7 @@ class BahdanauSeq2Seq(nn.Module):
             src_mask = positions < src_lengths.to(src.device).unsqueeze(1)
 
         encoder_outputs, hidden = self.encoder(src, src_lengths)
+        projected_keys = self.attention.key_layer(encoder_outputs)
 
         outputs = []
 
@@ -246,6 +243,7 @@ class BahdanauSeq2Seq(nn.Module):
             # AI Amended: Pass encoder keys and decoder query to attention correctly.
             attention = self.attention(
                 encoder_outputs=encoder_outputs,
+                projected_keys=projected_keys,
                 prev_hidden_decoder=hidden,
                 src_mask=src_mask,
             )

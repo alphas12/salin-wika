@@ -33,6 +33,12 @@ def test_both_models_support_training_and_inference():
     ]
 
     for model in models:
+        key_projection_calls = []
+        if isinstance(model, BahdanauSeq2Seq):
+            hook = model.attention.key_layer.register_forward_hook(
+                lambda *_: key_projection_calls.append(1)
+            )
+
         logits = model(
             src=src,
             src_lengths=src_lengths,
@@ -50,6 +56,10 @@ def test_both_models_support_training_and_inference():
                 max_length=2,
             )
         ) == 2
+
+        if isinstance(model, BahdanauSeq2Seq):
+            hook.remove()
+            assert len(key_projection_calls) == 2
 
 
 if __name__ == "__main__":
