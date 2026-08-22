@@ -170,7 +170,12 @@ class BahdanauDecoder(nn.Module):
         output = output.squeeze(1)
 
         # [B, Dec] -> [B, V_tgt]
-        logits = self.output(output)
+        logits = self.output(
+            torch.cat(
+                [output, attention.squeeze(1), embedding.squeeze(1)],
+                dim=-1,
+            )
+        )
 
         # [1, B, Dec] -> [B, Dec]
         hidden = hidden.squeeze(0)
