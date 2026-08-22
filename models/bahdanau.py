@@ -141,7 +141,7 @@ class BahdanauDecoder(nn.Module):
         )
 
         self.output = nn.Linear(
-            in_features=decoder_dim, 
+            in_features=decoder_dim + encoder_dim * 2 + embedding_dim, 
             out_features=output_dim,
         )
 
