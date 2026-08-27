@@ -1,8 +1,14 @@
 # SalinWika
 
-SalinWika is a configuration-driven CLI for translation, full fine-tuning, and new-language adaptation with Meta's `facebook/nllb-200-distilled-600M` checkpoint.
+<!-- AI Amended: Align project usage with the current three-pipeline architecture. -->
 
-> NLLB is released under CC BY-NC 4.0 for research use. Its model card says it is not intended for production, certified, medical, legal, or document translation.
+SalinWika is a configuration-driven CLI for multilingual translation, full
+fine-tuning, and new-language adaptation using Meta's
+`facebook/nllb-200-distilled-600M` checkpoint.
+
+> NLLB uses the CC BY-NC 4.0 license. Its model card describes it as a research
+> model that is not intended for production, certified, medical, legal, or
+> document translation.
 
 ## Setup
 
@@ -14,51 +20,107 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-All settings live in `config.yaml`. `device` accepts `auto`, `cuda`, `mps`, or `cpu`; an explicitly unavailable device fails instead of silently falling back.
+All runtime and training settings live in `config.yaml`. `device` accepts
+`auto`, `cuda`, `mps`, or `cpu`; requesting an unavailable device raises an
+error instead of silently falling back.
 
 ## CLI
 
+SalinWika has three pipelines:
+
 ```bash
-python main.py preload
 python main.py translate
 python main.py finetune
 python main.py adapt
 ```
 
-- `preload` loads the configured tokenizer and model, applies maximum generation length and beam search, reports readiness, and exits.
-- `translate` loads once, uses the YAML source/target pair, and repeatedly prompts for text until `/exit`.
-- `finetune` updates all model weights for one configured, already-supported language pair.
-- `adapt` adds one new language token, resizes the embeddings, and updates all weights using both new→pivot and pivot→new examples.
+- `translate` prompts for the source and target language, then translates until
+  `/exit`.
+- `finetune` updates all model weights using configured, model-supported
+  languages.
+- `adapt` adds one unsupported language token, resizes the token embeddings, and
+  updates all model weights from parallel data.
 
-The default available languages are Tagalog, Cebuano, Ilocano, Waray, and Pangasinense. To use an adapted model, set `model.name_or_path` to its result directory and add the new name/code to `languages`.
+Every command first loads the selected tokenizer and model. The default configured
+languages are Tagalog, Cebuano, Ilocano, Waray, and Pangasinense.
+
+## Model versions
+
+The original NLLB checkpoint is selected with:
+
+```yaml
+model:
+  version: default
+  default_name_or_path: facebook/nllb-200-distilled-600M
+  directory: models
+```
+
+To use a trained model saved as `models/multilingual-finetuned`, set:
+
+```yaml
+model:
+  version: multilingual-finetuned
+  default_name_or_path: facebook/nllb-200-distilled-600M
+  directory: models
+```
+
+For an adapted model, also add the new language name and code to `languages`
+before using it for translation or fine-tuning.
 
 ## Corpus format
 
-Each run accepts one parallel pair in a two-column UTF-8 CSV:
+Fine-tuning and adaptation require a UTF-8 CSV with these exact columns:
 
 ```csv
-cebuano,tagalog
-Maayong buntag.,Magandang umaga.
+source_sentence,target_sentence,src_lang,tgt_lang
+Maayong buntag.,Magandang umaga.,cebuano,tagalog
+Naimbag a bigat.,Magandang umaga.,ilocano,tagalog
 ```
 
-Set the path, column names, and language names in `fine_tuning` or `adaptation`. Rows with null or blank sentences are rejected. A CSV containing several language columns is not mixed automatically; run each pair separately or first convert it into separate two-column corpora.
+One corpus may contain more than two languages and multiple translation pairs.
+All cells must contain non-blank text.
 
-Splits are deterministic. Adaptation splits the original pairs before reversing them, so a sentence pair and its reverse stay in the same split.
+Fine-tuning requires every language to exist in `languages` and in the selected
+tokenizer. If NLLB already supports a language that is missing from `languages`,
+add its name/code mapping and use fine-tuning.
+
+Adaptation accepts one new language per run. The new code must not already be
+supported by the selected tokenizer, and every row must contain the new language
+on exactly one side. The other side may use any configured, supported language.
+
+Set `switch_source_target: true` in the selected pipeline section to reverse all
+source sentences, target sentences, and language fields. Reverse rows are not
+created automatically.
 
 ## Training and outputs
 
-Training uses Hugging Face `Seq2SeqTrainer`, dynamic padding, epoch validation/checkpointing, early stopping, and full-weight updates without gradient accumulation. Held-out results include loss, FLORES-200 spBLEU, and chrF++.
+Training uses Hugging Face `Seq2SeqTrainer`, dynamic padding, deterministic data
+splits, epoch validation and checkpointing, optional early stopping, and
+best-model restoration by validation loss. It performs full-weight updates with
+no gradient accumulation.
 
-Each run is saved in standard Hugging Face format below `results/<run_name>/`:
+Held-out results include loss, FLORES-200 spBLEU, and chrF++. Mixed target
+languages are evaluated with the correct forced target token for each group.
+
+Each run is saved below `models/<run_name>` and contains:
 
 - model and tokenizer files loadable with `from_pretrained()`;
-- best/limited checkpoints and trainer state;
+- bounded checkpoints and Trainer state;
 - `effective_config.yaml`;
-- train, validation, and test metric JSON files.
+- train, validation, and test metrics.
 
-The 600M model should be trained on a capable GPU. CPU is suitable for CLI inference and tests but is impractical for the provided 104K-pair corpus. The first spBLEU evaluation downloads SacreBLEU's FLORES-200 tokenizer.
+Training only directly optimizes corpus directions. An adapted Hiligaynon–Tagalog
+model may transfer to Hiligaynon–Cebuano, but that direction is not guaranteed
+without corresponding parallel examples.
 
-Run tests with:
+The 600M model should be trained on a capable GPU. CPU is suitable for tests and
+limited inference but is impractical for substantial training. The first spBLEU
+evaluation may download SacreBLEU's FLORES-200 tokenizer.
+
+## Tests
+
+The pytest layout mirrors the five modules in `src/` and uses lightweight fakes,
+so tests do not download or train NLLB:
 
 ```bash
 python -m pytest -q
@@ -69,14 +131,21 @@ python -m pytest -q
 ```bash
 docker build -t salinwika .
 docker run --rm salinwika --help
-docker run --rm -it -v "$PWD/config.yaml:/app/config.yaml:ro" salinwika translate
-docker run --rm --gpus all \
+docker run --rm -it \
+  -v "$PWD/config.yaml:/app/config.yaml:ro" \
+  -v "$PWD/models:/app/models" \
+  salinwika translate
+docker run --rm -it --gpus all \
   -v "$PWD/config.yaml:/app/config.yaml:ro" \
   -v "$PWD/corpus:/app/corpus:ro" \
-  -v "$PWD/results:/app/results" \
+  -v "$PWD/models:/app/models" \
   salinwika finetune
 ```
 
-Apple MPS is available only to local macOS Python, not inside the Linux container.
+Apple MPS is available only to local macOS Python, not inside the Linux
+container.
 
-See [Architecture](docs/ARCHITECTURE.md), [Code Guide](docs/CODE_GUIDE.md), the [NLLB documentation](https://huggingface.co/docs/transformers/model_doc/nllb), and the [official model card](https://huggingface.co/facebook/nllb-200-distilled-600M).
+See [Architecture](docs/ARCHITECTURE.md), [Code Guide](docs/CODE_GUIDE.md), the
+[NLLB documentation](https://huggingface.co/docs/transformers/model_doc/nllb),
+and the
+[official model card](https://huggingface.co/facebook/nllb-200-distilled-600M).
