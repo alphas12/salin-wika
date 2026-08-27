@@ -1,40 +1,82 @@
-# SalinWika!
+# SalinWika
 
-> **NOTE: PLEASE CLEAN THE CORPUS BEFORE TRAINING, AND IT MUST BE IN .CSV FORMAT WITH TWO (2) COLUMNS (FOR THE TWO LANGUAGES)**
+SalinWika is a configuration-driven CLI for translation, full fine-tuning, and new-language adaptation with Meta's `facebook/nllb-200-distilled-600M` checkpoint.
 
-This project trains and runs a Cebuano-to-Tagalog LSTM encoder-decoder without attention. Configuration lives only in `config.yaml`, and generated artifacts always live in `results/`. More language support will be provided soon (I'm still testing with the models themselves). Contributions for this project are more than welcome!.
+> NLLB is released under CC BY-NC 4.0 for research use. Its model card says it is not intended for production, certified, medical, legal, or document translation.
 
-### **PROJECT GOAL: Support for various Filipino languages**
-**Current Goal: Train on Eng-Fil to find the best translation model**
+## Setup
 
+Use Python 3.12 or newer:
 
-## Local setup
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
 
-Use Python 3.12, then run `python -m pip install -r requirements.txt`. The PyTorch dependency prefers the CUDA 12.8 wheel on supported Linux/Windows computers, uses the native macOS wheel on Mac, and automatically falls back to CPU at runtime. Set `device` in `config.yaml` to `auto`, `cuda`, `mps`, or `cpu`.
+All settings live in `config.yaml`. `device` accepts `auto`, `cuda`, `mps`, or `cpu`; an explicitly unavailable device fails instead of silently falling back.
 
-The CLI has exactly two commands:
+## CLI
 
-- `python main.py training`
-- `python main.py translation`
+```bash
+python main.py preload
+python main.py translate
+python main.py finetune
+python main.py adapt
+```
 
-Before either command, edit `config.yaml`. Translation reads `translation.text` and loads `results/<translation.model_name>/best_model.pt` plus that run's saved configuration and vocabularies.
+- `preload` loads the configured tokenizer and model, applies maximum generation length and beam search, reports readiness, and exits.
+- `translate` loads once, uses the YAML source/target pair, and repeatedly prompts for text until `/exit`.
+- `finetune` updates all model weights for one configured, already-supported language pair.
+- `adapt` adds one new language token, resizes the embeddings, and updates all weights using both new→pivot and pivot→new examples.
 
-## Docker (Recommended setup)
+The default available languages are Tagalog, Cebuano, Ilocano, Waray, and Pangasinense. To use an adapted model, set `model.name_or_path` to its result directory and add the new name/code to `languages`.
 
-Build with `docker build -t encoder-decoder .`.
+## Corpus format
 
-Docker builds use CPU PyTorch on ARM64 hosts such as Apple Silicon and the CUDA 12.8 wheel on AMD64 NVIDIA training computers. The Linux container cannot use Apple MPS.
+Each run accepts one parallel pair in a two-column UTF-8 CSV:
 
-Train on CPU with `docker run --rm -v "$PWD/results:/app/results" encoder-decoder training`.
+```csv
+cebuano,tagalog
+Maayong buntag.,Magandang umaga.
+```
 
-Train on an NVIDIA GPU by adding `--gpus all`: `docker run --rm --gpus all -v "$PWD/results:/app/results" encoder-decoder training`.
+Set the path, column names, and language names in `fine_tuning` or `adaptation`. Rows with null or blank sentences are rejected. A CSV containing several language columns is not mixed automatically; run each pair separately or first convert it into separate two-column corpora.
 
-Translate with `docker run --rm -v "$PWD/config.yaml:/app/config.yaml:ro" -v "$PWD/results:/app/results" encoder-decoder translation`.
+Splits are deterministic. Adaptation splits the original pairs before reversing them, so a sentence pair and its reverse stay in the same split.
 
-The Docker host must have Docker's NVIDIA GPU support configured for `--gpus all`. Apple MPS remains available for local Python runs.
+## Training and outputs
 
-## Outputs
+Training uses Hugging Face `Seq2SeqTrainer`, dynamic padding, epoch validation/checkpointing, early stopping, and full-weight updates without gradient accumulation. Held-out results include loss, FLORES-200 spBLEU, and chrF++.
 
-Each training run writes checkpoints, the best model, vocabularies, the effective configuration, loss/perplexity history, and BLEU results below `results/<training.name>/`.
+Each run is saved in standard Hugging Face format below `results/<run_name>/`:
 
-See [ARCHITECTURE.md](docs/ARCHITECTURE.md) and [CODE_GUIDE.md](docs/CODE_GUIDE.md) for the full project map.
+- model and tokenizer files loadable with `from_pretrained()`;
+- best/limited checkpoints and trainer state;
+- `effective_config.yaml`;
+- train, validation, and test metric JSON files.
+
+The 600M model should be trained on a capable GPU. CPU is suitable for CLI inference and tests but is impractical for the provided 104K-pair corpus. The first spBLEU evaluation downloads SacreBLEU's FLORES-200 tokenizer.
+
+Run tests with:
+
+```bash
+python -m pytest -q
+```
+
+## Docker
+
+```bash
+docker build -t salinwika .
+docker run --rm salinwika --help
+docker run --rm -it -v "$PWD/config.yaml:/app/config.yaml:ro" salinwika translate
+docker run --rm --gpus all \
+  -v "$PWD/config.yaml:/app/config.yaml:ro" \
+  -v "$PWD/corpus:/app/corpus:ro" \
+  -v "$PWD/results:/app/results" \
+  salinwika finetune
+```
+
+Apple MPS is available only to local macOS Python, not inside the Linux container.
+
+See [Architecture](docs/ARCHITECTURE.md), [Code Guide](docs/CODE_GUIDE.md), the [NLLB documentation](https://huggingface.co/docs/transformers/model_doc/nllb), and the [official model card](https://huggingface.co/facebook/nllb-200-distilled-600M).
