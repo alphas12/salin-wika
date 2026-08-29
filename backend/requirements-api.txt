@@ -1,0 +1,5 @@
+# Additional dependencies for the web API layer.
+# Install alongside the project's existing requirements.txt:
+#   pip install -r requirements.txt -r requirements-api.txt
+fastapi>=0.111
+uvicorn[standard]>=0.30
