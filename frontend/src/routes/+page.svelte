@@ -13,14 +13,12 @@
   let loading = false;
   let error = '';
   let modelsError = '';
-  let backendStatus = 'checking';
-  let backendMessage = 'Connecting to the FastAPI backend...';
   let samples = [
     'Maayong buntag.',
     'Asa ka paingon?',
     'Palihog tabangi ko.'
   ];
-  let corpusMessage = 'Loading corpus examples...';
+  let corpusMessage = 'Loading local demo corpus...';
 
   onMount(async () => {
     const [healthResult, modelsResult, samplesResult] = await Promise.allSettled([
@@ -30,11 +28,7 @@
     ]);
 
     if (healthResult.status === 'fulfilled') {
-      backendStatus = 'online';
-      backendMessage = 'FastAPI backend is online.';
-    } else {
-      backendStatus = 'offline';
-      backendMessage = healthResult.reason instanceof Error ? healthResult.reason.message : String(healthResult.reason);
+      // Local interface mode does not require a backend service.
     }
 
     if (modelsResult.status === 'fulfilled') {
@@ -46,11 +40,11 @@
 
     if (samplesResult.status === 'fulfilled' && samplesResult.value.length) {
       samples = samplesResult.value.map((sample) => sample.source_text);
-      corpusMessage = `Loaded ${samplesResult.value.length} corpus examples from cebtag_bible_31k.csv.`;
+      corpusMessage = `Loaded ${samplesResult.value.length} local demo corpus samples.`;
     } else if (samplesResult.status === 'rejected') {
       corpusMessage = samplesResult.reason instanceof Error ? samplesResult.reason.message : String(samplesResult.reason);
     } else {
-      corpusMessage = 'Corpus examples are unavailable right now.';
+      corpusMessage = 'Local corpus examples are unavailable right now.';
     }
   });
 
@@ -65,7 +59,7 @@
     const text = event.detail;
 
     if (!selectedModel) {
-      error = 'No trained model is available yet. Add a run under results/ first.';
+      error = 'No model is available in interface mode.';
       return;
     }
 
@@ -88,7 +82,7 @@
   <title>SalinWika | Cebuano to Tagalog</title>
   <meta
     name="description"
-    content="SalinWika translates Cebuano text to Tagalog using a FastAPI backend and Svelte frontend."
+    content="SalinWika is a local interface for Cebuano to Tagalog translation demos."
   />
 </svelte:head>
 
@@ -96,18 +90,16 @@
   <section class="hero">
     <div class="hero__copy">
       <p class="hero__eyebrow">SalinWika</p>
-      <h1>Cebuano to Tagalog translation, tuned for your trained FastAPI model.</h1>
+      <h1>
+        Cebuano to<br />
+        Tagalog<br />
+        translation.
+      </h1>
       <p class="hero__tagline">
-        Paste Cebuano text, pick the run your partner trained, and translate in a single
-        screen.
+        Paste Cebuano text, pick a local demo model, and translate directly in the UI.
       </p>
     </div>
 
-    <div class="hero__status" data-state={backendStatus}>
-      <span class="hero__status-label">Backend</span>
-      <strong>{backendStatus === 'online' ? 'Connected' : backendStatus === 'checking' ? 'Checking' : 'Offline'}</strong>
-      <p>{backendMessage}</p>
-    </div>
   </section>
 
   <section class="quick-actions">
@@ -129,7 +121,7 @@
       <ModelPicker {models} bind:selected={selectedModel} />
     </div>
   {:else}
-    <p class="page__status">No trained runs were found yet. Put your partner's model under results/ to enable translation.</p>
+    <p class="page__status">No local demo model is available yet.</p>
   {/if}
 
   <section class="panels">
@@ -147,21 +139,20 @@
   }
 
   .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.9fr);
-    gap: 1.25rem;
-    align-items: stretch;
+    display: block;
+    width: 100%;
     margin-bottom: 1.25rem;
   }
 
   .hero__copy,
-  .hero__status,
   .quick-actions {
+    width: 100%;
     background: rgba(17, 21, 28, 0.52);
     border: 1px solid rgba(42, 53, 65, 0.95);
     backdrop-filter: blur(14px);
     border-radius: 24px;
     box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
+    box-sizing: border-box;
   }
 
   .hero__copy {
@@ -169,8 +160,7 @@
   }
 
   .hero__eyebrow,
-  .quick-actions__label,
-  .hero__status-label {
+  .quick-actions__label {
     font-family: var(--font-mono);
     font-size: 0.72rem;
     letter-spacing: 0.12em;
@@ -181,43 +171,19 @@
   .hero__copy h1 {
     margin: 0.45rem 0 0;
     font-family: var(--font-display);
-    font-size: clamp(2.35rem, 4.6vw, 4.6rem);
-    line-height: 0.98;
-    letter-spacing: -0.04em;
-    max-width: 12ch;
+    font-size: clamp(4.2rem, 7.2vw, 9rem);
+    line-height: 0.8;
+    letter-spacing: -0.06em;
+    max-width: 6.2ch;
+    color: #f4f5f5;
   }
 
   .hero__tagline {
-    margin: 1rem 0 0;
-    max-width: 58ch;
+    margin: 1.2rem 0 0;
+    max-width: 48ch;
     color: var(--color-text-muted);
     line-height: 1.7;
-  }
-
-  .hero__status {
-    padding: 1.35rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 0.9rem;
-  }
-
-  .hero__status strong {
-    font-size: 1.35rem;
-  }
-
-  .hero__status p {
-    margin: 0;
-    color: var(--color-text-muted);
-    line-height: 1.55;
-  }
-
-  .hero__status[data-state='online'] {
-    border-color: rgba(74, 155, 142, 0.45);
-  }
-
-  .hero__status[data-state='offline'] {
-    border-color: rgba(224, 132, 122, 0.45);
+    font-size: 1.05rem;
   }
 
   .quick-actions {
@@ -254,6 +220,7 @@
   }
 
   .page__controls {
+    width: 100%;
     margin-bottom: 1.5rem;
     max-width: 100%;
   }
@@ -268,9 +235,9 @@
 
   .panels {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     gap: 1.25rem;
-    align-items: start;
+    align-items: stretch;
   }
 
   .panels__divider {

@@ -1,7 +1,6 @@
 import { c as create_ssr_component, b as setContext, v as validate_component, m as missing_component } from "./ssr.js";
 import { a as afterUpdate } from "./ssr2.js";
 import "./server.js";
-import "./shared-server.js";
 const Root = create_ssr_component(($$result, $$props, $$bindings, slots) => {
   let { stores } = $$props;
   let { page } = $$props;
@@ -87,6 +86,12 @@ function set_read_implementation(fn) {
   read_implementation = fn;
 }
 function set_manifest(_) {
+}
+let public_env = {};
+function set_private_env(environment) {
+}
+function set_public_env(environment) {
+  public_env = environment;
 }
 const error = ({ status, message }) => '<!doctype html>\n<html lang="en">\n	<head>\n		<meta charset="utf-8" />\n		<title>' + message + `</title>
 
@@ -179,7 +184,7 @@ const options = {
     app: ({ head, body, assets, nonce, env }) => '<!doctype html>\n<html lang="en">\n  <head>\n    <meta charset="utf-8" />\n    <link rel="icon" href="data:," />\n    <meta name="viewport" content="width=device-width, initial-scale=1" />\n    ' + head + '\n  </head>\n  <body data-sveltekit-preload-data="hover">\n    <div style="display: contents">' + body + "</div>\n  </body>\n</html>\n",
     error
   },
-  version_hash: "1388ph2"
+  version_hash: "jdvzay"
 };
 async function get_hooks() {
   let handle;
@@ -200,9 +205,12 @@ async function get_hooks() {
   };
 }
 export {
-  set_manifest as a,
+  set_public_env as a,
+  set_read_implementation as b,
+  set_manifest as c,
   get_hooks as g,
   options as o,
+  public_env as p,
   read_implementation as r,
-  set_read_implementation as s
+  set_private_env as s
 };

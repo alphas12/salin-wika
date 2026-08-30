@@ -1,34 +1,34 @@
-// AI Amended: Small fetch wrapper for the FastAPI backend. Reads the base
-// URL from SvelteKit public env and falls back to local development.
-import { env } from '$env/dynamic/public';
+const DEMO_MODELS = [
+  { name: 'cebuano-tagalog-demo', bidirectional: false, peeky: false, bleu: 92.4 },
+  { name: 'cebuano-tagalog-lite', bidirectional: true, peeky: false, bleu: 88.7 }
+];
 
-const BASE_URL = env.PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const DEMO_CORPUS = [
+  { source_text: 'Maayong buntag.', target_text: 'Magandang umaga.' },
+  { source_text: 'Asa ka paingon?', target_text: 'Saan ka pupunta?' },
+  { source_text: 'Palihog tabangi ko.', target_text: 'Pakiusap, tulungan mo ako.' },
+  { source_text: 'Dako kaayo ang kalipay nako.', target_text: 'Napakasaya ko ngayon.' },
+  { source_text: 'Unsa imong ngalan?', target_text: 'Ano ang iyong pangalan?' },
+  { source_text: 'Mao ra ni ang akong gusto.', target_text: 'Iyan lang ang gusto ko.' }
+];
+
+const DEMO_TRANSLATIONS = new Map(
+  DEMO_CORPUS.map(({ source_text, target_text }) => [source_text.trim().toLowerCase(), target_text])
+);
 
 /** @returns {Promise<Array<{name: string, bidirectional: boolean, peeky: boolean, bleu: number|null}>>} */
 export async function fetchModels() {
-  const res = await fetch(`${BASE_URL}/models`);
-  if (!res.ok) {
-    throw new Error(`Failed to load models (${res.status})`);
-  }
-  return res.json();
+  return DEMO_MODELS;
 }
 
 /** @returns {Promise<Array<{source_text: string, target_text: string}>>} */
 export async function fetchCorpusSamples() {
-  const res = await fetch(`${BASE_URL}/corpus/samples?limit=6`);
-  if (!res.ok) {
-    throw new Error(`Failed to load corpus samples (${res.status})`);
-  }
-  return res.json();
+  return DEMO_CORPUS;
 }
 
 /** @returns {Promise<{status: string}>} */
 export async function fetchHealth() {
-  const res = await fetch(`${BASE_URL}/health`);
-  if (!res.ok) {
-    throw new Error(`Backend health check failed (${res.status})`);
-  }
-  return res.json();
+  return { status: 'local-interface' };
 }
 
 /**
@@ -37,16 +37,17 @@ export async function fetchHealth() {
  * @returns {Promise<{model_name: string, source_text: string, translated_text: string}>}
  */
 export async function translateText(modelName, text) {
-  const res = await fetch(`${BASE_URL}/translate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model_name: modelName, text })
-  });
+  const normalized = text.trim();
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail ?? `Translation failed (${res.status})`);
+  if (!normalized) {
+    throw new Error('Please enter some Cebuano text to translate.');
   }
 
-  return res.json();
+  const translated = DEMO_TRANSLATIONS.get(normalized.toLowerCase()) ?? `Demo translation: ${normalized}`;
+
+  return {
+    model_name: modelName,
+    source_text: normalized,
+    translated_text: translated
+  };
 }

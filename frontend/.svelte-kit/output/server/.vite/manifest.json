@@ -6,8 +6,7 @@
     "isEntry": true,
     "imports": [
       "_internal.js",
-      "_server.js",
-      "_shared-server.js"
+      "_server.js"
     ]
   },
   "_exports.js": {
@@ -20,17 +19,12 @@
     "imports": [
       "_ssr.js",
       "_ssr2.js",
-      "_server.js",
-      "_shared-server.js"
+      "_server.js"
     ]
   },
   "_server.js": {
     "file": "chunks/server.js",
     "name": "server"
-  },
-  "_shared-server.js": {
-    "file": "chunks/shared-server.js",
-    "name": "shared-server"
   },
   "_ssr.js": {
     "file": "chunks/ssr.js",
@@ -84,7 +78,6 @@
       "_exports.js",
       "_utils2.js",
       "_ssr.js",
-      "_shared-server.js",
       "_internal.js"
     ]
   },
@@ -106,11 +99,10 @@
     "src": "src/routes/+page.svelte",
     "isEntry": true,
     "imports": [
-      "_ssr.js",
-      "_shared-server.js"
+      "_ssr.js"
     ],
     "css": [
-      "_app/immutable/assets/_page.CKokA_zw.css"
+      "_app/immutable/assets/_page.DS7fw5HE.css"
     ]
   },
   "virtual:__sveltekit/env": {

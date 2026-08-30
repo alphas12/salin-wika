@@ -28,6 +28,8 @@
 <style>
   .result {
     display: flex;
+    flex: 1 1 auto;
+    width: 100%;
     flex-direction: column;
     gap: 0.75rem;
     padding: 1rem;
@@ -35,6 +37,8 @@
     border: 1px solid var(--color-border);
     border-radius: 20px;
     box-shadow: 0 22px 50px rgba(0, 0, 0, 0.22);
+    min-height: 100%;
+    box-sizing: border-box;
   }
 
   .result__header {
@@ -58,11 +62,13 @@
   }
 
   .result__body {
+    flex: 1;
     background: linear-gradient(180deg, rgba(33, 43, 55, 0.98), rgba(26, 34, 44, 0.98));
     border: 1px solid var(--color-border);
     border-radius: 16px;
     padding: 0.9rem;
     min-height: 14rem;
+    height: 100%;
     font-size: 1rem;
     line-height: 1.6;
     white-space: pre-wrap;

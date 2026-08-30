@@ -46,6 +46,7 @@
 <style>
   .picker {
     display: flex;
+    width: 100%;
     flex-direction: column;
     gap: 0.75rem;
     padding: 1rem;
@@ -53,6 +54,7 @@
     border: 1px solid var(--color-border);
     border-radius: 20px;
     box-shadow: 0 22px 50px rgba(0, 0, 0, 0.22);
+    box-sizing: border-box;
   }
 
   .picker__label {
@@ -94,18 +96,21 @@
   }
 
   .picker__select {
+    width: 100%;
     background: var(--color-surface-raised);
     color: var(--color-text);
     border: 1px solid var(--color-border);
     border-radius: 14px;
     padding: 0.5rem 0.75rem;
     font-size: 0.95rem;
+    box-sizing: border-box;
   }
 
   .picker__details {
     margin: 0;
-    color: var(--color-text-muted);
-    font-size: 0.92rem;
+    color: rgba(211, 221, 231, 0.7);
+    font-size: 0.72rem;
     line-height: 1.5;
+    font-style: italic;
   }
 </style>
